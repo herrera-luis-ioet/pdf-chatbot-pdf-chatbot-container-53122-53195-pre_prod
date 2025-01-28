@@ -1,1 +1,3 @@
-# pdf-chatbot-pdf-chatbot-container-53122-53195-pre_prod
+# Project Repository
+
+This is the initial README file for the project.
