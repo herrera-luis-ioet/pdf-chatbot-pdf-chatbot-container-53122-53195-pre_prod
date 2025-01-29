@@ -54,7 +54,7 @@ const PDFUpload = ({ onUploadSuccess }) => {
       setUploadStatus('error');
       setError(err.response?.data?.message || 'Error uploading file');
     }
-  }, []);
+  }, [onUploadSuccess]); // Dependency required as it's used inside the callback
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

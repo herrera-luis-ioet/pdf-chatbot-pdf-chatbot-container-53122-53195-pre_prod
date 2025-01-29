@@ -12,6 +12,20 @@ const ChatInterface = ({ pdfId }) => {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
+  const fetchChatHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/chat/${pdfId}/history`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch chat history');
+      }
+      const data = await response.json();
+      setMessages(data.messages || []);
+    } catch (err) {
+      setError('Failed to load chat history');
+      console.error('Error fetching chat history:', err);
+    }
+  }, [pdfId]); // Only pdfId needs to be in dependencies as setMessages and setError are stable
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -68,21 +82,8 @@ const ChatInterface = ({ pdfId }) => {
         }
       };
     }
-  }, [pdfId]);
+  }, [pdfId, fetchChatHistory]);
 
-  const fetchChatHistory = async () => {
-    try {
-      const response = await fetch(`/api/chat/${pdfId}/history`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch chat history');
-      }
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (err) {
-      setError('Failed to load chat history');
-      console.error('Error fetching chat history:', err);
-    }
-  };
 
   const sendMessage = (e) => {
     e.preventDefault();
