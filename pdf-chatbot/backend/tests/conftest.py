@@ -5,15 +5,11 @@ from models import db as _db, PDFDocument, ChatMessage
 from datetime import datetime, timedelta
 
 @pytest.fixture
-def app(tmp_path):
+def app():
     """Create application for the tests."""
     _app = create_app('testing')
-    # Configure test upload folder
-    _app.config['UPLOAD_FOLDER'] = str(tmp_path / "test_uploads")
+    # Ensure test upload folder exists
     os.makedirs(_app.config['UPLOAD_FOLDER'], exist_ok=True)
-    # Configure test database
-    _app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    _app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     return _app
 
 @pytest.fixture
@@ -33,7 +29,7 @@ def client(app):
 @pytest.fixture
 def mock_pdf_content():
     """Create mock PDF content for testing."""
-    return b"%PDF-1.4\n%¥±ë\n1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj"
+    return b"%PDF-1.4\n%PDF-1.4\n1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj"
 
 @pytest.fixture
 def sample_pdf(db):

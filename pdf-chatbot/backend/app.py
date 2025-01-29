@@ -11,6 +11,9 @@ from models import db, ChatMessage
 from pdf_handler import PDFHandler
 from chatbot import ChatbotService
 
+# Initialize SocketIO at module level for proper registration
+socketio = SocketIO(cors_allowed_origins="*")
+
 def create_app(config_class=None):
     """Create and configure the Flask application.
     
@@ -18,7 +21,7 @@ def create_app(config_class=None):
         config_class: Configuration class to use. If None, determined from environment.
     
     Returns:
-        Configured Flask application instance.
+        Configured Flask application instance with SocketIO integration.
     """
     app = Flask(__name__)
     
@@ -30,7 +33,7 @@ def create_app(config_class=None):
     # Initialize extensions
     CORS(app)
     db.init_app(app)
-    socketio = SocketIO(app, cors_allowed_origins="*")
+    socketio.init_app(app)
     
     # Create database tables
     with app.app_context():
@@ -69,7 +72,9 @@ def create_app(config_class=None):
             JSON response with upload status and file details or error message.
         """
         try:
+            # Validate request
             if 'file' not in request.files:
+                app.logger.warning("Upload attempt without file")
                 return jsonify({
                     'status': 'error',
                     'message': 'No file part in the request'
@@ -77,6 +82,7 @@ def create_app(config_class=None):
                 
             file = request.files['file']
             if file.filename == '':
+                app.logger.warning("Upload attempt with empty filename")
                 return jsonify({
                     'status': 'error',
                     'message': 'No file selected'
@@ -85,6 +91,7 @@ def create_app(config_class=None):
             # Validate file
             is_valid, error = pdf_handler.validate_file(file)
             if not is_valid:
+                app.logger.warning(f"Invalid file upload attempt: {error}")
                 return jsonify({
                     'status': 'error',
                     'message': error
@@ -93,6 +100,7 @@ def create_app(config_class=None):
             # Save file and create database record
             pdf_doc, error = pdf_handler.save_file(file)
             if error:
+                app.logger.error(f"Failed to save uploaded file: {error}")
                 return jsonify({
                     'status': 'error',
                     'message': error
@@ -190,70 +198,70 @@ def create_app(config_class=None):
                 'status': 'error',
                 'message': 'Internal server error'
             }), 500
-    
-    @socketio.on('connect')
-    def handle_connect():
-        """Handle WebSocket connection."""
-        app.logger.info('Client connected')
-        emit('connection_status', {'status': 'connected'})
-
-    @socketio.on('disconnect')
-    def handle_disconnect():
-        """Handle WebSocket disconnection."""
-        app.logger.info('Client disconnected')
-
-    @socketio.on('chat_message')
-    def handle_chat_message(data):
-        """Handle incoming chat messages via WebSocket.
-        
-        Args:
-            data: Dictionary containing message data (pdf_id, message)
-        """
-        try:
-            pdf_id = data.get('pdf_id')
-            message = data.get('message')
-            user_id = 1  # TODO: Replace with actual user ID from authentication
-
-            if not pdf_id or not message:
-                emit('error', {'message': 'Invalid message data'})
-                return
-
-            response, confidence = chatbot_service.process_message(
-                user_id=user_id,
-                pdf_id=pdf_id,
-                message=message
-            )
-
-            # Emit the response to all clients viewing the same PDF
-            emit('chat_response', {
-                'pdf_id': pdf_id,
-                'message': message,
-                'response': response,
-                'confidence': confidence,
-                'timestamp': datetime.now().isoformat()
-            }, room=str(pdf_id))
-
-        except Exception as e:
-            app.logger.error(f"Error processing WebSocket message: {str(e)}")
-            emit('error', {'message': 'Internal server error'})
-
-    @socketio.on('join')
-    def handle_join(data):
-        """Handle client joining a PDF-specific room.
-        
-        Args:
-            data: Dictionary containing pdf_id
-        """
-        pdf_id = data.get('pdf_id')
-        if pdf_id:
-            join_room(str(pdf_id))
-            emit('room_joined', {'pdf_id': pdf_id})
 
     return app
 
-# Create the application instance
+# Create the application instance with default configuration
 app = create_app()
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle WebSocket connection."""
+    app.logger.info('Client connected')
+    emit('connection_status', {'status': 'connected'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle WebSocket disconnection."""
+    app.logger.info('Client disconnected')
+
+@socketio.on('chat_message')
+def handle_chat_message(data):
+    """Handle incoming chat messages via WebSocket.
+    
+    Args:
+        data: Dictionary containing message data (pdf_id, message)
+    """
+    try:
+        pdf_id = data.get('pdf_id')
+        message = data.get('message')
+        user_id = 1  # TODO: Replace with actual user ID from authentication
+
+        if not pdf_id or not message:
+            emit('error', {'message': 'Invalid message data'})
+            return
+
+        chatbot_service = ChatbotService()
+        response, confidence = chatbot_service.process_message(
+            user_id=user_id,
+            pdf_id=pdf_id,
+            message=message
+        )
+
+        # Emit the response to all clients viewing the same PDF
+        emit('chat_response', {
+            'pdf_id': pdf_id,
+            'message': message,
+            'response': response,
+            'confidence': confidence,
+            'timestamp': datetime.now().isoformat()
+        }, room=str(pdf_id))
+
+    except Exception as e:
+        app.logger.error(f"Error processing WebSocket message: {str(e)}")
+        emit('error', {'message': 'Internal server error'})
+
+@socketio.on('join')
+def handle_join(data):
+    """Handle client joining a PDF-specific room.
+    
+    Args:
+        data: Dictionary containing pdf_id
+    """
+    pdf_id = data.get('pdf_id')
+    if pdf_id:
+        join_room(str(pdf_id))
+        emit('room_joined', {'pdf_id': pdf_id})
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

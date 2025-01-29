@@ -1,6 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import './ChatInterface.css';
+
+const SOCKET_CONFIG = {
+  path: '/socket.io',
+  transports: ['websocket'],
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  timeout: 10000,
+};
 
 // PUBLIC_INTERFACE
 const ChatInterface = ({ pdfId }) => {
@@ -9,6 +18,8 @@ const ChatInterface = ({ pdfId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [connectionError, setConnectionError] = useState(null);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -37,40 +48,60 @@ const ChatInterface = ({ pdfId }) => {
   // Initialize WebSocket connection
   useEffect(() => {
     if (pdfId) {
-      // Initialize socket connection
-      socketRef.current = io('/', {
-        path: '/socket.io',
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-      });
+      try {
+        // Initialize socket connection
+        socketRef.current = io('/', SOCKET_CONFIG);
 
-      // Socket event handlers
-      socketRef.current.on('connect', () => {
-        setIsConnected(true);
-        socketRef.current.emit('join', { pdf_id: pdfId });
-      });
+        // Socket event handlers
+        socketRef.current.on('connect', () => {
+          setIsConnected(true);
+          setConnectionError(null);
+          setRetryCount(0);
+          socketRef.current.emit('join', { pdf_id: pdfId });
+        });
 
-      socketRef.current.on('disconnect', () => {
-        setIsConnected(false);
-      });
+        socketRef.current.on('disconnect', () => {
+          setIsConnected(false);
+          setConnectionError('Connection lost. Attempting to reconnect...');
+        });
 
-      socketRef.current.on('chat_response', (data) => {
-        if (data.pdf_id === pdfId) {
-          setMessages(prev => [...prev, {
-            content: data.response,
-            type: 'bot',
-            timestamp: data.timestamp
-          }]);
+        socketRef.current.on('connect_error', (error) => {
+          setConnectionError(`Connection error: ${error.message}`);
+          setRetryCount((prev) => prev + 1);
+        });
+
+        socketRef.current.on('reconnect_attempt', (attemptNumber) => {
+          setRetryCount(attemptNumber);
+          if (attemptNumber >= SOCKET_CONFIG.reconnectionAttempts) {
+            setConnectionError('Maximum reconnection attempts reached. Please refresh the page.');
+          }
+        });
+
+        socketRef.current.on('reconnect', () => {
+          setIsConnected(true);
+          setConnectionError(null);
+          setRetryCount(0);
+          socketRef.current.emit('join', { pdf_id: pdfId });
+        });
+
+        socketRef.current.on('chat_response', (data) => {
+          if (data.pdf_id === pdfId) {
+            setMessages(prev => [...prev, {
+              content: data.response,
+              type: 'bot',
+              timestamp: data.timestamp
+            }]);
+            setIsLoading(false);
+          }
+        });
+
+        socketRef.current.on('error', (data) => {
+          setError(data.message);
           setIsLoading(false);
-        }
-      });
-
-      socketRef.current.on('error', (data) => {
-        setError(data.message);
-        setIsLoading(false);
-      });
+        });
+      } catch (err) {
+        setConnectionError(`Failed to initialize socket connection: ${err.message}`);
+      }
 
       // Fetch initial chat history
       fetchChatHistory();
@@ -78,6 +109,13 @@ const ChatInterface = ({ pdfId }) => {
       // Cleanup on unmount
       return () => {
         if (socketRef.current) {
+          socketRef.current.off('connect');
+          socketRef.current.off('disconnect');
+          socketRef.current.off('connect_error');
+          socketRef.current.off('reconnect_attempt');
+          socketRef.current.off('reconnect');
+          socketRef.current.off('chat_response');
+          socketRef.current.off('error');
           socketRef.current.disconnect();
         }
       };
@@ -108,8 +146,8 @@ const ChatInterface = ({ pdfId }) => {
   };
 
   return (
-    <div className="chat-interface">
-      <div className="chat-messages">
+    <div className="chat-interface" data-testid="chat-container">
+      <div className="chat-messages" data-testid="message-list">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -131,6 +169,16 @@ const ChatInterface = ({ pdfId }) => {
             {error}
           </div>
         )}
+        {connectionError && (
+          <div className="connection-error">
+            {connectionError}
+            {retryCount > 0 && retryCount < SOCKET_CONFIG.reconnectionAttempts && (
+              <div className="retry-count">
+                Retry attempt {retryCount} of {SOCKET_CONFIG.reconnectionAttempts}
+              </div>
+            )}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={sendMessage} className="chat-input-form">
@@ -140,10 +188,12 @@ const ChatInterface = ({ pdfId }) => {
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder="Type your message..."
           disabled={isLoading || !pdfId}
+          data-testid="message-input"
         />
         <button
           type="submit"
           disabled={isLoading || !inputMessage.trim() || !pdfId}
+          data-testid="send-button"
         >
           Send
         </button>

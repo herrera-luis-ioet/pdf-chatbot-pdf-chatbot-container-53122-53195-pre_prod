@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './PDFUpload.css';
@@ -65,12 +65,13 @@ const PDFUpload = ({ onUploadSuccess }) => {
   });
 
   return (
-    <div className="pdf-upload-container">
+    <div className="pdf-upload-container" data-testid="pdf-upload">
       <div
         {...getRootProps()}
         className={`dropzone ${isDragActive ? 'active' : ''} ${
           uploadStatus === 'error' ? 'error' : ''
         }`}
+        data-testid="upload-dropzone"
       >
         <input {...getInputProps()} />
         {isDragActive ? (
@@ -81,7 +82,7 @@ const PDFUpload = ({ onUploadSuccess }) => {
       </div>
 
       {uploadStatus === 'uploading' && (
-        <div className="progress-container">
+        <div className="progress-container" data-testid="upload-progress">
           <div className="progress-bar">
             <div
               className="progress-fill"
@@ -99,7 +100,7 @@ const PDFUpload = ({ onUploadSuccess }) => {
       )}
 
       {error && (
-        <div className="error-message">
+        <div className="error-message" data-testid="upload-error">
           <p>{error}</p>
         </div>
       )}

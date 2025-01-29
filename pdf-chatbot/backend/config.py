@@ -23,10 +23,12 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'TEST_DATABASE_URL',
-        'postgresql://postgres:postgres@localhost:5432/pdf_chatbot_test'
-    )
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Disable CSRF tokens in testing
+    WTF_CSRF_ENABLED = False
+    # Make the instance folder temporary for testing
+    UPLOAD_FOLDER = '/tmp/test_uploads'
 
 class ProductionConfig(Config):
     """Production configuration."""

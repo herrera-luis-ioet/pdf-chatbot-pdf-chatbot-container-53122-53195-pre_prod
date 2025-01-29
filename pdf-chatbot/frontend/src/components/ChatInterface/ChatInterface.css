@@ -86,6 +86,22 @@
   border-radius: 4px;
 }
 
+.connection-error {
+  color: #856404;
+  text-align: center;
+  padding: 10px;
+  margin: 10px 0;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+}
+
+.retry-count {
+  font-size: 0.875rem;
+  margin-top: 5px;
+  color: #666;
+}
+
 .loading {
   display: flex;
   align-items: center;

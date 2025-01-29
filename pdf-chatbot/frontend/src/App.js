@@ -11,14 +11,20 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div className="App" data-testid="app-container">
       <header className="App-header">
         <h1>PDF Chatbot</h1>
         <p>Upload your PDF file to start chatting</p>
       </header>
       <main>
-        <PDFUpload onUploadSuccess={handlePdfUploadSuccess} />
-        {currentPdfId && <ChatInterface pdfId={currentPdfId} />}
+        <div data-testid="pdf-upload-container">
+          <PDFUpload onUploadSuccess={handlePdfUploadSuccess} />
+        </div>
+        {currentPdfId && (
+          <div data-testid="chat-interface-container">
+            <ChatInterface pdfId={currentPdfId} />
+          </div>
+        )}
       </main>
     </div>
   );
