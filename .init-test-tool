@@ -1,0 +1,1 @@
+{"command": "cd frontend && npm test -- --watchAll=false && cd ../backend && python -m pytest", "working_directory": "/home/kavia/workspace/pdf-chatbot-pdf-chatbot-container-53122-53195-pre_prod/pdf-chatbot"}

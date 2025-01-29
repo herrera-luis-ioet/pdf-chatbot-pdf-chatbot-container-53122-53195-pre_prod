@@ -1,0 +1,9 @@
+{
+  "name": "pdf-chatbot",
+  "version": "0.1.0",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.19.0",
+    "eslint-plugin-react": "^7.37.4"
+  }
+}
